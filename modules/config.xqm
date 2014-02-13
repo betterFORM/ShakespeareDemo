@@ -34,6 +34,7 @@ declare variable $config:repo-descriptor := doc(concat($config:app-root, "/repo.
 declare variable $config:expath-descriptor := doc(concat($config:app-root, "/expath-pkg.xml"))/expath:package;
 
 declare variable $config:data := $config:app-root || '/data';
+declare variable $config:annotations := concat($config:data, "/annotations");
 
 (:~
  : Resolve the given path using the current application context.
