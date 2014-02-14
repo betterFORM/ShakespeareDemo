@@ -15,12 +15,11 @@ declare function tei2:tei2html($nodes as node()*) {
             let $built-up-a8ns := tei2:build-up-annotations($top-level-a8ns, collection($config:a8ns)/*)
             let $collapsed-a8ns := tei2:collapse-annotations($built-up-a8ns)
             let $meshed-a8ns := 
-                if ($top-level-a8ns) then
-                tei2:mesh-annotations($node, $collapsed-a8ns)
+                if ($top-level-a8ns) 
+                then tei2:mesh-annotations($node, $collapsed-a8ns)
                 else $node
-            let $log := util:log("DEBUG", ("##$meshed-a8ns): ", $meshed-a8ns))
-                return
-                    $node
+            return
+                $meshed-a8ns
 };
 
 declare function tei2:a8ns2span($nodes as node()*) {
@@ -176,12 +175,18 @@ let $segments :=
 let $segments := 
         for $segment in $segments
             return
-                if (number($segment/@n) mod 2 eq 0)
-                then 
+                if (number($segment/@n) mod 2 eq 0) (:an annotation:)
+                then
                     let $annotation-n := $segment/@n/number() div 2
+                    let $annotation := $annotations[$annotation-n]
+                    let $annotation-start := number($annotation//a8n:start)
+                    let $annotation-offset := number($annotation//a8n:offset)
+                    let $annotation-body-child := $annotation/(* except a8n:target)
+                    let $annotated-string := substring($base-text, $annotation-start, $annotation-offset)
+                    let $annotation := element {'span'}{attribute{'class'}{local-name($annotation-body-child)}, $annotated-string}
                     return
-                        local:insert-elements($segment, $annotations[$annotation-n]/(* except a8n:target), 'segment', 'first-child')
-                else 
+                        local:insert-elements($segment, $annotation, 'segment', 'first-child')
+                else (:a text node:)
                     <segment n="{$segment/@n/string()}">
                         {
                             let $segment-n := number($segment/@n)
@@ -189,22 +194,55 @@ let $segments :=
                             let $following-annotation-n := ($segment-n + 1) div 2
                             let $start := 
                                 if ($segment-n eq $segment-count) (:if it is the last text node:)
-                                then string-length($base-text) - $annotations[$previous-annotation-n]/a8n:target/a8n:start/number() + $annotations[$previous-annotation-n]/target/offset/number() + 4 (:the start position is the length of of the base text minus the end position of the previous annotation plus 1:)(:NB: why 4?:)
+                                then 
+                                    ($annotations[$previous-annotation-n]/a8n:target/a8n:start/number() 
+                                    + 
+                                    $annotations[$previous-annotation-n]/a8n:target/a8n:offset/number())
+                                    
+                                    (:the start position is the length of of the base text minus the end position of the previous annotation plus 1:)
                                 else
                                     if (number($segment/@n) eq 1) (:if it is the first text node:)
                                     then 1 (:start with position 1:)
-                                    else $annotations[$previous-annotation-n]/a8n:target/a8n:start/number() + $annotations[$previous-annotation-n]/target/offset/number() (:if it is not the first or last text node, start with the position of the previous annotation plus its offset plus 1:)
+                                    else 
+                                        $annotations[$previous-annotation-n]/a8n:target/a8n:start/number() 
+                                        + 
+                                        $annotations[$previous-annotation-n]/a8n:target/a8n:offset/number()
+                                        (:if it is not the first or last text node, 
+                                        start with the position of the previous annotation plus its offset plus 1:)
                             let $offset := 
-                                if ($segment-n eq count($segments)) 
-                                then string-length($base-text) - $annotations[$previous-annotation-n]/a8n:target/a8n:start/number() + $annotations[$previous-annotation-n]/target/offset/number() + 1 (:if it is the last text node, then the offset is the length of the base text minus the end position of the last annotation plus 1:)
+                                if ($segment-n eq count($segments))  (:if it is the last text node:)
+                                then 
+                                    string-length($base-text) 
+                                    - 
+                                    (
+                                    $annotations[$previous-annotation-n]/a8n:target/a8n:start/number() 
+                                    + 
+                                    $annotations[$previous-annotation-n]/a8n:target/a8n:offset/number()
+                                    )
+                                    + 
+                                    1 
+                                (:if it is the last text node, then the offset is the length of the base text minus the end position of the last annotation plus 1:)
                                 else
-                                    if ($segment-n eq 1)
-                                    then $annotations[$following-annotation-n]/a8n:target/a8n:start/number() - 1 (:if it is the first text node, the the offset is the start position of the following annotation minus 1:)
-                                    else $annotations[$following-annotation-n]/a8n:target/a8n:start/number() - ($annotations[number($previous-annotation-n)]/target/start/number() + $annotations[$previous-annotation-n]/target/offset/number()) (:if it is not the first or the last text node, then the offset is the start position of the following annotation minus the end position of the previous annotation :)
-                                return
-                                    if (string($start) and string($offset))
-                                    then substring($base-text, $start, $offset)
-                                    else $base-text
+                                    if ($segment-n eq 1) (:if it is the first text node:)
+                                    then 
+                                        $annotations[$following-annotation-n]/a8n:target/a8n:start/number()
+                                        -
+                                        1
+                                        (:if it is the first text node, the the offset is the start position of the following annotation minus 1:)
+                                    else 
+                                        $annotations[$following-annotation-n]/a8n:target/a8n:start/number() 
+                                        - 
+                                        (
+                                        $annotations[$previous-annotation-n]/a8n:target/a8n:start/number() 
+                                        + 
+                                        $annotations[$previous-annotation-n]/a8n:target/a8n:offset/number()
+                                        )
+                                        (:if it is not the first or the last text node, then the offset is the start position of the following annotation minus the end position of the previous annotation :)
+                            return
+                                if (number($start) and number($offset))
+                                then substring($base-text, $start, $offset)
+                                else $base-text
+                            
                         }
                     </segment>
 let $segments :=
