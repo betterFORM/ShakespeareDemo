@@ -175,7 +175,8 @@ a:hover { color: #ffcb05; }
 #sub-right { float: right; width: 240px; }
 
 #content h1 { font: 175% "Quicksand", "Arial", Helvetica, sans-serif; margin: 10px 0 20px; }
-#content h2 { color: #0083cb; padding: 10px 0 5px; }
+/*#content h2 { color: #0083cb; padding: 10px 0 5px; }*/
+#content div.div div.head { color: #0083cb; padding: 10px 0 5px; font-size: 1.2em; padding: 10px 0; font-weight: bold; font-family: "Century Gothic", Verdana, Helvetica, sans-serif; letter-spacing: 1px;}
 
 blockquote { padding: 10px 15px 0 15px; border: 1px solid #abe1ff; background: #FFF; margin: 5px 0 10px; }
 blockquote h3 { padding: 0; border: 0; margin: 0; font-size: 12px; color: #0083cb }
@@ -395,7 +396,12 @@ ul {
     text-align: left;
 }
 
-.sp .line {
+/*.sp .line {
+    margin: 0 0 0 2em;
+}
+*/
+
+div.sp div.l {
     margin: 0 0 0 2em;
 }
 
