@@ -74,12 +74,12 @@ declare function tei2:build-up-annotations($top-level-critical-annotations as el
     for $annotation in $top-level-critical-annotations
         let $annotation-id := $annotation/@xml:id
         let $annotation-element-name := local-name($annotation//body/*)
-        let $children := $annotations/annotation[target/annotation-layer/id = $annotation-id]
+        let $children := $annotations/a8n:annotation[a8n:target/a8n:annotation-layer/a8n:id = $annotation-id]
         let $children :=
             for $child in $children
                 let $child-id := $annotation/@xml:id/string()
                     return
-                        if ($annotations/annotation[target/annotation-layer/id = $child-id])
+                        if ($annotations/a8n:annotation[a8n:target/a8n:annotation-layer/a8n:id = $child-id])
                         then tei2:build-up-annotations($child, $annotations)
                         else $child
             return 
@@ -250,7 +250,7 @@ let $segments :=
                             return
                                 if (number($start) and number($offset))
                                 then substring($base-text, $start, $offset)
-                                else '!ERROR!'
+                                else ''
                             
                         }
                     </segment>
