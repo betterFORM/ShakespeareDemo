@@ -182,8 +182,18 @@ let $segments :=
                     let $annotation-start := number($annotation//a8n:start)
                     let $annotation-offset := number($annotation//a8n:offset)
                     let $annotation-body-child := $annotation/(* except a8n:target)
+                    let $annotation-body-child := local-name($annotation-body-child)
                     let $annotated-string := substring($base-text, $annotation-start, $annotation-offset)
-                    let $annotation := element {'span'}{attribute{'class'}{local-name($annotation-body-child)}, $annotated-string}
+                    let $annotation := 
+                        element{'span'}
+                        {
+                        attribute class {$annotation-body-child}
+                        ,
+                        attribute xml:id {$annotation/@xml:id/string()}
+                        ,
+                        attribute title {$annotation-body-child}
+                        , 
+                        $annotated-string}
                     return
                         local:insert-elements($segment, $annotation, 'segment', 'first-child')
                 else (:a text node:)
@@ -195,10 +205,9 @@ let $segments :=
                             let $start := 
                                 if ($segment-n eq $segment-count) (:if it is the last text node:)
                                 then 
-                                    ($annotations[$previous-annotation-n]/a8n:target/a8n:start/number() 
+                                    $annotations[$previous-annotation-n]/a8n:target/a8n:start/number() 
                                     + 
-                                    $annotations[$previous-annotation-n]/a8n:target/a8n:offset/number())
-                                    
+                                    $annotations[$previous-annotation-n]/a8n:target/a8n:offset/number()
                                     (:the start position is the length of of the base text minus the end position of the previous annotation plus 1:)
                                 else
                                     if (number($segment/@n) eq 1) (:if it is the first text node:)
@@ -241,7 +250,7 @@ let $segments :=
                             return
                                 if (number($start) and number($offset))
                                 then substring($base-text, $start, $offset)
-                                else $base-text
+                                else '!ERROR!'
                             
                         }
                     </segment>
@@ -254,4 +263,3 @@ let $segments :=
     return 
         element {node-name($base-text)}{$base-text/@*, $segments}
 };
-
