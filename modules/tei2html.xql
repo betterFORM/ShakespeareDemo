@@ -7,13 +7,28 @@ import module namespace config="http://exist-db.org/apps/shakes/config" at "conf
 declare namespace tei="http://www.tei-c.org/ns/1.0";
 declare namespace a8n="http://www.betterform.de/projects/mopane/annotation";
 
+declare variable $tei2:layer := 'feature';
+declare variable $tei2:format := 'html';
+
 declare function tei2:tei2html($nodes as node()*) {
     for $node in $nodes
         return
-            let $node := tei2:tei2div($node)
-            let $top-level-a8ns := tei2:get-a8ns($node)
-            let $built-up-a8ns := tei2:build-up-annotations($top-level-a8ns, collection($config:a8ns)/*)
-            let $collapsed-a8ns := tei2:collapse-annotations($built-up-a8ns)
+            let $node := 
+                if ($tei2:format eq 'html')
+                then tei2:tei2div($node)
+                else $node
+            let $top-level-a8ns := 
+                if ($tei2:layer eq 'feature')
+                then tei2:get-feature-a8ns($node)
+                else tei2:get-edition-a8ns($node)
+            let $built-up-a8ns := 
+                if ($tei2:format eq 'html')
+                then $top-level-a8ns
+                else tei2:build-up-annotations($top-level-a8ns, collection($config:a8ns)/*)
+            let $collapsed-a8ns := 
+                if ($tei2:format eq 'html')
+                then $built-up-a8ns 
+                else tei2:collapse-annotations($built-up-a8ns)
             let $meshed-a8ns := 
                 if ($top-level-a8ns) 
                 then tei2:mesh-annotations($node, $collapsed-a8ns)
@@ -36,13 +51,19 @@ declare function tei2:tei2div($nodes as node()*) {
         }
 };
 
-declare function tei2:get-a8ns($element as element()) {
+declare function tei2:get-edition-a8ns($element as element()) {
     let $element-id := $element/@xml:id/string()
-    let $top-level-a8ns := collection($config:a8ns)/a8n:annotation[a8n:target/@type eq 'range'](:[a8n:target/@layer eq 'edition']:)[a8n:target/a8n:id[. eq $element-id]]
+    let $top-level-edition-a8ns := collection($config:a8ns)/a8n:annotation[a8n:target/@type eq 'range'][a8n:target/@layer eq 'edition'][a8n:target/a8n:id[. eq $element-id]]
     return 
-        $top-level-a8ns 
+        $top-level-edition-a8ns 
 };
 
+declare function tei2:get-feature-a8ns($element as element()) {
+    let $element-id := $element/@xml:id/string()
+    let $top-level-feature-a8ns := collection($config:a8ns)/a8n:annotation[a8n:target/@type eq 'range'][a8n:target/@layer ne 'edition'][a8n:target/a8n:id[. eq $element-id]]
+    return 
+        $top-level-feature-a8ns 
+};
 
 declare function tei2:header($header as element(tei:teiHeader)) {
     let $titleStmt := $header//tei:titleStmt
@@ -175,7 +196,10 @@ let $segments :=
                     let $annotation-start := number($annotation//a8n:start)
                     let $annotation-offset := number($annotation//a8n:offset)
                     let $annotation-body-child := $annotation/(* except a8n:target)
-                    let $annotation-body-child := local-name($annotation-body-child)
+                    let $annotation-body-child := 
+                        if ($tei2:format eq 'html')
+                        then local-name($annotation-body-child/*)
+                        else local-name($annotation-body-child)
                     let $annotated-string := substring($base-text, $annotation-start, $annotation-offset)
                     let $annotation := 
                         element{'span'}
