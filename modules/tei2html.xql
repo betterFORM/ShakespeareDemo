@@ -7,26 +7,25 @@ import module namespace config="http://exist-db.org/apps/shakes/config" at "conf
 declare namespace tei="http://www.tei-c.org/ns/1.0";
 declare namespace a8n="http://www.betterform.de/projects/mopane/annotation";
 
-declare variable $tei2:layer := 'feature';
 declare variable $tei2:format := 'html';
 
-declare function tei2:tei2html($nodes as node()*) {
+declare function tei2:tei2html($nodes as node()*, $layer as xs:string, $format as xs:string) {
     for $node in $nodes
         return
             let $node := 
-                if ($tei2:format eq 'html')
+                if ($format eq 'html')
                 then tei2:tei2div($node)
                 else $node
             let $top-level-a8ns := 
-                if ($tei2:layer eq 'feature')
+                if ($layer eq 'feature')
                 then tei2:get-feature-a8ns($node)
                 else tei2:get-edition-a8ns($node)
             let $built-up-a8ns := 
-                if ($tei2:format eq 'html')
+                if ($format eq 'html')
                 then $top-level-a8ns
                 else tei2:build-up-annotations($top-level-a8ns, collection($config:a8ns)/*)
             let $collapsed-a8ns := 
-                if ($tei2:format eq 'html')
+                if ($format eq 'html')
                 then $built-up-a8ns 
                 else tei2:collapse-annotations($built-up-a8ns)
             let $meshed-a8ns := 
@@ -46,7 +45,7 @@ declare function tei2:tei2div($nodes as node()*) {
         for $child in $node/node()
             return
                 if ($child instance of element())
-                    then tei2:tei2html($child)
+                    then tei2:tei2html($child, 'feature', 'html')
                     else $child
         }
 };
@@ -79,7 +78,7 @@ declare function tei2:header($header as element(tei:teiHeader)) {
                     <li>{$resp/tei:resp/text()}: {$resp/tei:name/text()}</li>
             }
             </ul>
-            { tei2:tei2html($pubStmt/*) }
+            { tei2:tei2html($pubStmt/*, 'feature', 'html') }
         </div>
 };
 

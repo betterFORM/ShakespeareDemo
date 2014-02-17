@@ -34,7 +34,7 @@ function app:work($node as node(), $model as map(*), $id as xs:string?) {
 };
 
 declare function app:header($node as node(), $model as map(*)) {
-    tei2:tei2html($model("work")/tei:teiHeader)
+    tei2:tei2html($model("work")/tei:teiHeader, 'feature', 'html')
 };
 
 declare function app:outline($node as node(), $model as map(*), $details as xs:string) {
@@ -130,7 +130,7 @@ declare function app:view($node as node(), $model as map(*), $id as xs:string) {
     for $div in $model("work")/id($id)
     return
         <div xmlns="http://www.w3.org/1999/xhtml" class="play">
-        { tei2:tei2html($div) }
+        { tei2:tei2html($div, 'feature', 'html') }
         </div>
 };
 
