@@ -14,7 +14,7 @@ declare function tei2:tei2html($nodes as node()*, $layer as xs:string, $format a
         return
             let $node := 
                 if ($format eq 'html')
-                then tei2:tei2div($node)
+                then tei2:tei2div($node, $layer, $format)
                 else $node
             let $top-level-a8ns := 
                 if ($layer eq 'feature')
@@ -30,13 +30,13 @@ declare function tei2:tei2html($nodes as node()*, $layer as xs:string, $format a
                 else tei2:collapse-annotations($built-up-a8ns)
             let $meshed-a8ns := 
                 if ($top-level-a8ns) 
-                then tei2:mesh-annotations($node, $collapsed-a8ns)
+                then tei2:mesh-annotations($node, $collapsed-a8ns, $layer, $format)
                 else $node
             return
                 $meshed-a8ns
 };
 
-declare function tei2:tei2div($nodes as node()*) {
+declare function tei2:tei2div($nodes as node()*, $layer as xs:string, $format as xs:string) {
     for $node in $nodes
     return
         element{'div'}
@@ -45,7 +45,7 @@ declare function tei2:tei2div($nodes as node()*) {
         for $child in $node/node()
             return
                 if ($child instance of element())
-                    then tei2:tei2html($child, 'feature', 'html')
+                    then tei2:tei2html($child, $layer, $format)
                     else $child
         }
 };
@@ -64,6 +64,7 @@ declare function tei2:get-feature-a8ns($element as element()) {
         $top-level-feature-a8ns 
 };
 
+(:unused function:)
 declare function tei2:header($header as element(tei:teiHeader)) {
     let $titleStmt := $header//tei:titleStmt
     let $pubStmt := $header//tei:publicationStmt
@@ -179,7 +180,8 @@ declare function tei2:collapse-annotation($element as element(), $strip as xs:st
 };
 
 (: This function merges the collapsed annotations with the base text. A sequence of slots (<segment/>) double the number of annotations plus 1 are created; the annotations are filled in the even slots and the text, with ranges calculated from the previous and following annotations, are filled in the uneven slots (uneven slots with empty strings can occur, but even slots all have annotations). :)
-declare function tei2:mesh-annotations($base-text as element(), $annotations as element()*) as node()+ {
+declare function tei2:mesh-annotations(
+    $base-text as element(), $annotations as element()*, $layer as xs:string, $format as xs:string) as node()+ {
 let $segment-count := (count($annotations) * 2) + 1
 let $segments :=
     for $segment at $i in 1 to $segment-count
