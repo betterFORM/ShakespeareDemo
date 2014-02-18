@@ -3,7 +3,7 @@
         <fulltext default="none" attributes="false"/>
         <lucene>
             <analyzer class="org.apache.lucene.analysis.standard.StandardAnalyzer">
-                <param name="stopwords" type="org.apache.lucene.analysis.util.CharArraySet"/>
+                <param name="stopwords" type="java.util.Set"/>
             </analyzer>
             <text qname="tei:sp"/>
             <text qname="tei:l"/>
@@ -13,6 +13,7 @@
         <!--new-->
         <create qname="@xml:id" type="xs:string"/>
         <create qname="@type" type="xs:string"/>
+        <create qname="@layer" type="xs:string"/>
         <create qname="a8n:id" type="xs:string"/>
     </index>
 </collection>
