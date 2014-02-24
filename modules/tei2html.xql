@@ -9,38 +9,64 @@ declare namespace a8n="http://www.betterform.de/projects/mopane/annotation";
 
 declare function tei2:tei2html($nodes as node()*, $layer as xs:string, $format as xs:string) {
     for $node in $nodes
+    
     (:let $log := util:log("DEBUG", ("##$node): ", $node)):)
+        
+        (:Get the document's xml:id.:)
+        (:This ID should be sent with the request, instead of being retrieved for each recursed node.:) 
+        let $doc-id := root($node)/*/@xml:id/string()
+        
         return
-            let $node := 
-                if ($format ne 'html')
-                then tei2:tei2div($node, $layer, $format)
-                else tei2:tei2tei($node, $layer, $format)
-            let $annotations := collection($config:a8ns)/*
+            
+            (:Recurse though the document.:)
+            let $node := tei2:tei2tei-recurser($node, $layer, $format)
+            
+            (:Get all annotations for the document in question.:) 
+            (:NB: This can be quite a lot, so some other approach should be found,
+            since each element makes this call.:)
+            let $annotations := collection(($config:a8ns) || "/" || $doc-id)/*
             (:let $log := util:log("DEBUG", ("##$annotations1): ", $annotations)):)
+            
+            (:Get the top-level edition annotations, that is, 
+            the edition annotations that connect to the text though text ranges.:)
             let $top-level-a8ns := 
                 if ($annotations)
                 then tei2:get-edition-a8ns($node, $annotations)
                 else ()
             (:let $log := util:log("DEBUG", ("##$top-level-a8ns): ", $top-level-a8ns)):)
+            
+            (:Build up the top-level edition annotations, that is, 
+            insert child annotations recursively into the top-level annotations.:)
             let $built-up-a8ns := 
                 if ($top-level-a8ns) 
                 then tei2:build-up-annotations($top-level-a8ns, $annotations)
                 else ()
             (:let $log := util:log("DEBUG", ("##$built-up-a8ns): ", $built-up-a8ns)):)
+            
+            (:Collapse the built-up annotations, that is, prepare them for insertion into the base text
+            by removing all elements except the contents of body.:) 
             let $collapsed-a8ns := 
                 if ($built-up-a8ns) 
                 then tei2:collapse-annotations($built-up-a8ns)
                 else ()
             (:let $log := util:log("DEBUG", ("##$collapsed-a8ns): ", $collapsed-a8ns)):)
+            
+            (:Insert the collapsed annotations into the base text.:)
             let $meshed-a8ns := 
                 if ($collapsed-a8ns) 
                 then tei2:mesh-annotations($node, $collapsed-a8ns, 'edition', $format)
                 else $node
-            (:let $log := util:log("DEBUG", ("##$meshed-a8ns): ", $meshed-a8ns)):)
-            let $target-text := tei2:separate-text-layers($meshed-a8ns, 'target')
+            let $log := util:log("DEBUG", ("##$meshed-a8ns): ", $meshed-a8ns))
+            
+            (:On the basis of the inserted edition annotations, contruct the target text.:)
+            let $target-text := 
+                if ($meshed-a8ns/text())
+                then tei2:tei2target($meshed-a8ns, 'target')
+                else $meshed-a8ns
             (:let $log := util:log("DEBUG", ("##$target-text): ", $target-text)):)
+            
             return
-                $meshed-a8ns
+                $target-text
 };
 
 (: Based on a list of TEI elements that alter the text, construct the altered (target) or the unaltered (base) text :)
@@ -103,6 +129,16 @@ declare function tei2:separate-text-layers($input as node()*, $target) as item()
                     default return tei2:separate-text-layers($node, $target)
 };
 
+declare function tei2:tei2target($nodes as node()*, $target as xs:string) {
+    for $node in $nodes
+    return
+        if ($node/text())
+        then element {node-name($node)}{$node/@*,tei2:separate-text-layers($node, $target)}
+        else element {node-name($node)}
+        {$node/@*, attribute {'class1'}{local-name($node)}
+        }
+};
+
 declare function tei2:tei2div($nodes as node()*, $layer as xs:string, $format as xs:string) {
     for $node in $nodes
     return
@@ -117,7 +153,7 @@ declare function tei2:tei2div($nodes as node()*, $layer as xs:string, $format as
         }
 };
 
-declare function tei2:tei2tei($nodes as node()*, $layer as xs:string, $format as xs:string) {
+declare function tei2:tei2tei-recurser($nodes as node()*, $layer as xs:string, $format as xs:string) {
     for $node in $nodes
     return
         element {node-name($node)}
