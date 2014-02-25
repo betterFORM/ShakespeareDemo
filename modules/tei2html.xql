@@ -82,6 +82,7 @@ declare function tei2:tei2html($nodes as node()*, $layer as xs:string, $format a
                 then tei2:mesh-annotations($target-text, $collapsed-a8ns, 'feature', $format)
                 else $node
             
+            let $html := tei2:tei2div($meshed-a8ns)
             return
                 $meshed-a8ns
 };
@@ -152,20 +153,20 @@ declare function tei2:tei2target($nodes as node()*, $target as xs:string) {
         if ($node/text())
         then element {node-name($node)}{$node/@*,tei2:separate-text-layers($node, $target)}
         else element {node-name($node)}
-        {$node/@*, attribute {'class1'}{local-name($node)}
+        {$node/@*, attribute {'class'}{local-name($node)}
         }
 };
 
-declare function tei2:tei2div($nodes as node()*, $layer as xs:string, $format as xs:string) {
+declare function tei2:tei2div($nodes as node()*) {
     for $node in $nodes
     return
         element{'div'}
-        {$node/@*, attribute {'class'}{local-name($node)}
+        {$node/@*
         , 
         for $child in $node/node()
             return
                 if ($child instance of element())
-                    then tei2:tei2html($child, $layer, $format)
+                    then tei2:tei2div($child)
                     else $child
         }
 };
@@ -336,10 +337,8 @@ let $segments :=
                             let $annotation-body-child := local-name($annotation-body-child) 
                             let $annotated-string := substring($base-text, $annotation-start, $annotation-offset)
                             return
-                                element{'span'}
+                                element{$annotation-body-child}
                                 {
-                                attribute class {$annotation-body-child}
-                                ,
                                 attribute xml:id {$annotation/@xml:id/string()}
                                 ,
                                 attribute title {$annotation-body-child}
