@@ -82,9 +82,9 @@ declare function tei2:tei2html($nodes as node()*, $layer as xs:string, $format a
                 then tei2:mesh-annotations($target-text, $collapsed-a8ns, 'feature', $format)
                 else $node
             
-            let $html := tei2:tei2div($meshed-a8ns)
+            let $html := $meshed-a8ns (:tei2:tei2div($meshed-a8ns):)
             return
-                $meshed-a8ns
+                $html
 };
 
 (: Based on a list of TEI elements that alter the text, construct the altered (target) or the unaltered (base) text :)
@@ -161,7 +161,7 @@ declare function tei2:tei2div($nodes as node()*) {
     for $node in $nodes
     return
         element{'div'}
-        {$node/@*
+        {$node/@*, attribute {'class'}{local-name($node)}
         , 
         for $child in $node/node()
             return
@@ -331,19 +331,29 @@ let $segments :=
                     let $annotation-start := number($annotation//a8n:start)
                     let $annotation-offset := number($annotation//a8n:offset)
                     let $annotation := 
-                        if ($layer eq 'feature')
+                        if ($layer eq 'feature' and $format eq 'html')
                         then
                             let $annotation-body-child := $annotation/(* except a8n:target)
-                            let $annotation-body-child := local-name($annotation-body-child) 
+                            let $annotation-body-child := node-name($annotation-body-child) 
                             let $annotated-string := substring($base-text, $annotation-start, $annotation-offset)
                             return
                                 element{$annotation-body-child}
                                 {
                                 attribute xml:id {$annotation/@xml:id/string()}
                                 ,
-                                attribute title {$annotation-body-child}
-                                , 
                                 $annotated-string}
+                        else 
+                            if ($layer eq 'feature' and $format ne 'html')
+                            then
+                                let $annotation-body-child := $annotation/(* except a8n:target)
+                                let $annotation-body-child := node-name($annotation-body-child) 
+                                let $annotated-string := substring($base-text, $annotation-start, $annotation-offset)
+                                return
+                                    element{$annotation-body-child}
+                                    {
+                                    attribute xml:id {$annotation/@xml:id/string()}
+                                    ,
+                                    $annotated-string}
                         else $annotation/(* except a8n:target)
                     return
                         local:insert-elements($segment, $annotation, 'segment', 'first-child')
