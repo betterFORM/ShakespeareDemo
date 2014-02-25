@@ -14,15 +14,14 @@ declare function tei2:tei2html($nodes as node()*, $layer as xs:string, $format a
         (:This ID should be sent with the request, instead of being retrieved for each recursed node.:) 
         let $doc-id := root($node)/*/@xml:id/string()
         
+        (:Get all annotations for the document in question.:)
+        (:The annotations should be sent with the request, instead of being retrieved for each recursed node.:)
+        let $annotations := collection(($config:a8ns) || "/" || $doc-id)/*
+        
         return
             
             (:Recurse though the document.:)
             let $node := tei2:tei2tei-recurser($node, $layer, $format)
-            
-            (:Get all annotations for the document in question.:) 
-            (:NB: This can be quite a lot, so some other approach should be found,
-            since each element makes this call.:)
-            let $annotations := collection(($config:a8ns) || "/" || $doc-id)/*
             
             (:Get the top-level edition annotations, that is, 
             the edition annotations that connect to the text though text ranges.:)
@@ -81,8 +80,8 @@ declare function tei2:tei2html($nodes as node()*, $layer as xs:string, $format a
                 if ($collapsed-a8ns) 
                 then tei2:mesh-annotations($target-text, $collapsed-a8ns, 'feature', $format)
                 else $node
-            
-            let $html := $meshed-a8ns (:tei2:tei2div($meshed-a8ns):)
+            let $log := util:log("DEBUG", ("##$meshed-a8ns): ", $meshed-a8ns))
+            let $html := (:$meshed-a8ns:) tei2:tei2div($meshed-a8ns)
             return
                 $html
 };
@@ -157,31 +156,35 @@ declare function tei2:tei2target($nodes as node()*, $target as xs:string) {
         }
 };
 
-declare function tei2:tei2div($nodes as node()*) {
-    for $node in $nodes
-    return
-        element{'div'}
+declare function tei2:tei2div($node as node()) {
+    element{'div'}
         {$node/@*, attribute {'class'}{local-name($node)}
         , 
         for $child in $node/node()
             return
-                if ($child instance of element())
-                    then tei2:tei2div($child)
-                    else $child
+                $child
         }
 };
 
-declare function tei2:tei2tei-recurser($nodes as node()*, $layer as xs:string, $format as xs:string) {
-    for $node in $nodes
-    return
-        element {node-name($node)}
+declare function tei2:tei2span($node as node()) {
+    element{'span'}
+        {$node/@*, attribute {'class'}{local-name($node)}
+        , 
+        for $child in $node/node()
+            return
+                $child
+        }
+};
+
+declare function tei2:tei2tei-recurser($node as node(), $layer as xs:string, $format as xs:string) {
+    element {node-name($node)}
         {$node/@*
         , 
         for $child in $node/node()
             return
                 if ($child instance of element())
-                    then tei2:tei2html($child, $layer, $format)
-                    else $child
+                then tei2:tei2html($child, $layer, $format)
+                else $child
         }
 };
 
