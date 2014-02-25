@@ -2,7 +2,7 @@
     <target type="range" layer="feature">
         <id>sha-ham101007</id>
         <start>42</start>
-        <offset>9</offset>
+        <offset>10</offset>
     </target>
     <body>
         <emph xmlns="http://www.tei-c.org/ns/1.0"/>
