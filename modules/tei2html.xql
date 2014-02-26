@@ -75,13 +75,16 @@ declare function tei2:tei2html($nodes as node()*, $layer as xs:string, $format a
                 then tei2:collapse-annotations($built-up-a8ns)
                 else ()
             
-            (:Insert the collapsed annotations into the target-text.:)
+            (:Insert the collapsed annotations into the target-text, producing the marked-up TEI document.:)
             let $meshed-a8ns := 
                 if ($collapsed-a8ns) 
                 then tei2:mesh-annotations($target-text, $collapsed-a8ns, 'feature', $format)
                 else $node
-            let $log := util:log("DEBUG", ("##$meshed-a8ns): ", $meshed-a8ns))
-            let $html := (:$meshed-a8ns:) tei2:tei2div($meshed-a8ns)
+            
+            (:Convert TEI document to HTML: block-level elements become divs and inline element become spans.:)
+            let $block-level-element-names := ('ab', 'body', 'castGroup', 'castItem', 'castList', 'div', 'front', 'head', 'l', 'lg', 'role', 'roleDesc', 'sp', 'speaker', 'stage', 'TEI', 'text', 'p', 'quote' )
+            let $html := tei2:tei2div($meshed-a8ns, $block-level-element-names)
+            
             return
                 $html
 };
@@ -156,25 +159,18 @@ declare function tei2:tei2target($nodes as node()*, $target as xs:string) {
         }
 };
 
-declare function tei2:tei2div($node as node()) {
-    element{'div'}
+declare function tei2:tei2div($node as node(), $block-level-element-names as xs:string+) {
+    element {if (local-name($node) = $block-level-element-names) then 'div' else 'span'}
         {$node/@*, attribute {'class'}{local-name($node)}
         , 
         for $child in $node/node()
-            return
-                $child
+            return 
+                if ($child instance of element() and not($child/@class))
+                then tei2:tei2div($child, $block-level-element-names)
+                else $child
         }
 };
 
-declare function tei2:tei2span($node as node()) {
-    element{'span'}
-        {$node/@*, attribute {'class'}{local-name($node)}
-        , 
-        for $child in $node/node()
-            return
-                $child
-        }
-};
 
 declare function tei2:tei2tei-recurser($node as node(), $layer as xs:string, $format as xs:string) {
     element {node-name($node)}
