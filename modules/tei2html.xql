@@ -8,85 +8,85 @@ declare namespace tei="http://www.tei-c.org/ns/1.0";
 declare namespace a8n="http://www.betterform.de/projects/mopane/annotation";
 
 declare function tei2:tei2html($nodes as node()*, $layer as xs:string, $format as xs:string) {
-    for $node in $nodes
         
-        (:Get the document's xml:id.:)
-        (:This ID should be sent with the request, instead of being retrieved for each recursed node.:) 
-        let $doc-id := root($node)/*/@xml:id/string()
+    (:Get the document's xml:id.:)
+    (:Before recursion, $nodes is a single element.:) 
+    let $doc-id := root($nodes)/*/@xml:id/string()
+    
+    (:Get all annotations for the elementin question.:)
+    let $annotations := collection(($config:a8ns) || "/" || $doc-id)/*
+    
+    return
+            
+        (:Recurse though the document.:)
+        let $node := tei2:tei2tei-recurser($nodes, $layer, $format)
         
-        (:Get all annotations for the document in question.:)
-        (:The annotations should be sent with the request, instead of being retrieved for each recursed node.:)
-        let $annotations := collection(($config:a8ns) || "/" || $doc-id)/*
+        (:Get the top-level edition annotations, that is, 
+        the edition annotations that connect to the base text though text ranges.:)
+        let $top-level-a8ns := 
+            if ($annotations)
+            then tei2:get-a8ns($node, $annotations, 'edition')
+            else ()
+        
+        (:Build up the top-level edition annotations, that is, 
+        insert child annotations recursively into the top-level annotations.:)
+        let $built-up-a8ns := 
+            if ($top-level-a8ns) 
+            then tei2:build-up-annotations($top-level-a8ns, $annotations)
+            else ()
+        
+        (:Collapse the built-up eidtion annotations, that is, prepare them for insertion into the base text
+        by removing all elements except the contents of body.:) 
+        let $collapsed-a8ns := 
+            if ($built-up-a8ns) 
+            then tei2:collapse-annotations($built-up-a8ns)
+            else ()
+        
+        (:Insert the collapsed annotations into the base-text.:)
+        let $meshed-a8ns := 
+            if ($collapsed-a8ns) 
+            then tei2:mesh-annotations($node, $collapsed-a8ns, 'edition', $format)
+            else $node
+        
+        (:On the basis of the inserted edition annotations, contruct the target text.:)
+        let $target-text := 
+            if ($meshed-a8ns/text())
+            then tei2:tei2target($meshed-a8ns, 'target')
+            else $meshed-a8ns
+            
+        (:Get the top-level feature annotations, that is, 
+        the feature annotations that connect to the target text though text ranges.:)
+        let $top-level-a8ns := 
+            if ($annotations)
+            then tei2:get-a8ns($node, $annotations, 'feature')
+            else ()
+        
+        (:Build up the top-level feature annotations, that is, 
+        insert child annotations recursively into the top-level annotations.:)
+        let $built-up-a8ns := 
+            if ($top-level-a8ns) 
+            then tei2:build-up-annotations($top-level-a8ns, $annotations)
+            else ()
+        
+        (:Collapse the built-up feature annotations, that is, prepare them for insertion into the target text
+        by removing all elements except the contents of body.:) 
+        let $collapsed-a8ns := 
+            if ($built-up-a8ns) 
+            then tei2:collapse-annotations($built-up-a8ns)
+            else ()
+        
+        (:Insert the collapsed annotations into the target text, producing the marked-up TEI document.:)
+        let $meshed-a8ns := 
+            if ($collapsed-a8ns) 
+            then tei2:mesh-annotations($target-text, $collapsed-a8ns, 'feature', $format)
+            else $node
+        
+        (:Convert the TEI document to HTML: block-level elements become divs and inline element become spans.:)
+        let $block-level-element-names := ('ab', 'body', 'castGroup', 'castItem', 'castList', 'div', 'front', 'head', 'l', 'lg', 'role', 'roleDesc', 'sp', 'speaker', 'stage', 'TEI', 'text', 'p', 'quote' )
+        let $html := tei2:tei2div($meshed-a8ns, $block-level-element-names)
         
         return
-            
-            (:Recurse though the document.:)
-            let $node := tei2:tei2tei-recurser($node, $layer, $format)
-            
-            (:Get the top-level edition annotations, that is, 
-            the edition annotations that connect to the text though text ranges.:)
-            let $top-level-a8ns := 
-                if ($annotations)
-                then tei2:get-edition-a8ns($node, $annotations)
-                else ()
-            
-            (:Build up the top-level edition annotations, that is, 
-            insert child annotations recursively into the top-level annotations.:)
-            let $built-up-a8ns := 
-                if ($top-level-a8ns) 
-                then tei2:build-up-annotations($top-level-a8ns, $annotations)
-                else ()
-            
-            (:Collapse the built-up annotations, that is, prepare them for insertion into the base text
-            by removing all elements except the contents of body.:) 
-            let $collapsed-a8ns := 
-                if ($built-up-a8ns) 
-                then tei2:collapse-annotations($built-up-a8ns)
-                else ()
-            
-            (:Insert the collapsed annotations into the base-text.:)
-            let $meshed-a8ns := 
-                if ($collapsed-a8ns) 
-                then tei2:mesh-annotations($node, $collapsed-a8ns, 'edition', $format)
-                else $node
-            
-            (:On the basis of the inserted edition annotations, contruct the target text.:)
-            let $target-text := 
-                if ($meshed-a8ns/text())
-                then tei2:tei2target($meshed-a8ns, 'target')
-                else $meshed-a8ns
-            
-            let $top-level-a8ns := 
-                if ($annotations)
-                then tei2:get-feature-a8ns($node, $annotations)
-                else ()
-            
-            (:Build up the top-level edition annotations, that is, 
-            insert child annotations recursively into the top-level annotations.:)
-            let $built-up-a8ns := 
-                if ($top-level-a8ns) 
-                then tei2:build-up-annotations($top-level-a8ns, $annotations)
-                else ()
-            
-            (:Collapse the built-up annotations, that is, prepare them for insertion into the base text
-            by removing all elements except the contents of body.:) 
-            let $collapsed-a8ns := 
-                if ($built-up-a8ns) 
-                then tei2:collapse-annotations($built-up-a8ns)
-                else ()
-            
-            (:Insert the collapsed annotations into the target-text, producing the marked-up TEI document.:)
-            let $meshed-a8ns := 
-                if ($collapsed-a8ns) 
-                then tei2:mesh-annotations($target-text, $collapsed-a8ns, 'feature', $format)
-                else $node
-            
-            (:Convert TEI document to HTML: block-level elements become divs and inline element become spans.:)
-            let $block-level-element-names := ('ab', 'body', 'castGroup', 'castItem', 'castList', 'div', 'front', 'head', 'l', 'lg', 'role', 'roleDesc', 'sp', 'speaker', 'stage', 'TEI', 'text', 'p', 'quote' )
-            let $html := tei2:tei2div($meshed-a8ns, $block-level-element-names)
-            
-            return
-                $html
+            $html
 };
 
 (: Based on a list of TEI elements that alter the text, construct the altered (target) or the unaltered (base) text :)
@@ -171,7 +171,6 @@ declare function tei2:tei2div($node as node(), $block-level-element-names as xs:
         }
 };
 
-
 declare function tei2:tei2tei-recurser($node as node(), $layer as xs:string, $format as xs:string) {
     element {node-name($node)}
         {$node/@*
@@ -184,18 +183,12 @@ declare function tei2:tei2tei-recurser($node as node(), $layer as xs:string, $fo
         }
 };
 
-declare function tei2:get-edition-a8ns($element as element(), $annotations as element()*) {
+(:The only $target value that is checked is 'edition'.:)
+declare function tei2:get-a8ns($element as element(), $annotations as element()*, $target as xs:string) {
     let $element-id := $element/@xml:id/string()
-    let $top-level-edition-a8ns := $annotations[a8n:target/@type eq 'range'][a8n:target/@layer eq 'edition'][a8n:target/a8n:id[. eq $element-id]]
+    let $top-level-edition-a8ns := $annotations[a8n:target/@type eq 'range'][a8n:target/@layer eq $target][a8n:target/a8n:id[. eq $element-id]]
     return 
         $top-level-edition-a8ns 
-};
-
-declare function tei2:get-feature-a8ns($element as element(), $annotations as element()*) {
-    let $element-id := $element/@xml:id/string()
-    let $top-level-feature-a8ns := collection($config:a8ns)/a8n:annotation[a8n:target/@type eq 'range'][a8n:target/@layer ne 'edition'][a8n:target/a8n:id[. eq $element-id]]
-    return 
-        $top-level-feature-a8ns 
 };
 
 (:unused function:)
@@ -339,6 +332,8 @@ let $segments :=
                                 element{$annotation-body-child}
                                 {
                                 attribute xml:id {$annotation/@xml:id/string()}
+                                ,
+                                attribute title {$annotation-body-child}
                                 ,
                                 $annotated-string}
                         else 
