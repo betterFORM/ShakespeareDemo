@@ -1,5 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <collection xmlns="http://exist-db.org/collection-config/1.0">
-    <index xmlns:tei="http://www.tei-c.org/ns/1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:a8n="http://www.betterform.de/projects/mopane/annotation">
+    <index xmlns:a8n="http://www.betterform.de/projects/mopane/annotation" xmlns:tei="http://www.tei-c.org/ns/1.0" xmlns:xlink="http://www.w3.org/1999/xlink">
         <fulltext default="none" attributes="false"/>
         <lucene>
             <analyzer class="org.apache.lucene.analysis.standard.StandardAnalyzer">
