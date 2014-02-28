@@ -13,8 +13,7 @@ declare function tei2:tei2html($nodes as node()*, $layer as xs:string, $format a
     (:Before recursion, $nodes is a single element.:) 
     let $doc-id := root($nodes)/*/@xml:id/string()
     
-    (:Get all annotations for the document in question.:)
-    (:NB: This is too much.:)
+    (:Get all annotations for the element in question.:)
     let $annotations := collection(($config:a8ns) || "/" || $doc-id)/*
     
     return
@@ -34,15 +33,14 @@ declare function tei2:annotate($nodes as node()*, $annotations as element()*, $l
         else ()
     
     (:Build up the top-level edition annotations, that is, 
-    insert annotations that reference the top-level annotations recursively into the top-level annotations.:)
+    insert child annotations recursively into the top-level annotations.:)
     let $built-up-a8ns := 
         if ($top-level-a8ns) 
         then tei2:build-up-annotations($top-level-a8ns, $annotations)
         else ()
     
-    (:Collapse the built-up edition annotations, that is, prepare them for insertion into the base text
-    by removing all elements except the contents of body.:)
-    (:TODO: there is no code for collapsing attributes.:)
+    (:Collapse the built-up eidtion annotations, that is, prepare them for insertion into the base text
+    by removing all elements except the contents of body.:) 
     let $collapsed-a8ns := 
         if ($built-up-a8ns) 
         then tei2:collapse-annotations($built-up-a8ns)
@@ -55,8 +53,6 @@ declare function tei2:annotate($nodes as node()*, $annotations as element()*, $l
         else $node
     
     (:On the basis of the inserted edition annotations, contruct the target text.:)
-    (:TODO: Into the target text, spans identifying the edition annotations should be inserted, 
-    in order to provide hooks to these annotations in the HTML.:)  
     let $target-text := 
         if ($meshed-a8ns/text())
         then tei2:tei2target($meshed-a8ns, 'target')
@@ -70,7 +66,7 @@ declare function tei2:annotate($nodes as node()*, $annotations as element()*, $l
         else ()
     
     (:Build up the top-level feature annotations, that is, 
-    insert annotations that reference the top-level annotations recursively into the top-level annotations.:)
+    insert child annotations recursively into the top-level annotations.:)
     let $built-up-a8ns := 
         if ($top-level-a8ns) 
         then tei2:build-up-annotations($top-level-a8ns, $annotations)
@@ -97,11 +93,7 @@ declare function tei2:annotate($nodes as node()*, $annotations as element()*, $l
         $html
 };
 
-(: Based on a list of TEI elements that alter the text, 
-construct the altered (target) or the unaltered (base) text :)
-(:Only the value "base" is checked.:)
-(:TODO: This function must in some way be included in the TEI header, 
-or the choices must be expressed in a manner that can feed the function.:)
+(: Based on a list of TEI elements that alter the text, construct the altered (target) or the unaltered (base) text :)
 declare function tei2:separate-text-layers($input as node()*, $target) as item()* {
     for $node in $input/node()
         return
@@ -158,30 +150,26 @@ declare function tei2:separate-text-layers($input as node()*, $target) as item()
                     then $node/string()
                     else ()
 
-                default return tei2:separate-text-layers($node, $target)
+                    default return tei2:separate-text-layers($node, $target)
 };
 
 declare function tei2:tei2target($nodes as node()*, $target as xs:string) {
     for $node in $nodes
     return
-        (:If the element has a text node, separate the text node.:)
-        (:TODO: Improve to make it possible for the whole text node to be wrapped up in an element.:)
-        if ($node/text()) 
+        if ($node/text())
         then element {node-name($node)}{$node/@*,tei2:separate-text-layers($node, $target)}
         else element {node-name($node)}
         {$node/@*, attribute {'class'}{local-name($node)}
         }
 };
 
-(:Convert TEI block-level elements into divs and inline elements into spans.:)
-(:The usual way of converting TEI into "semantic" HTML is avoided.:)
 declare function tei2:tei2div($node as node(), $block-level-element-names as xs:string+) {
     element {if (local-name($node) = $block-level-element-names) then 'div' else 'span'}
         {$node/@*, attribute {'class'}{local-name($node)}
         , 
         for $child in $node/node()
             return 
-                if ($child instance of element() and not($child/@class)) (:NB: Find out why there are class attributes already here.:)
+                if ($child instance of element() and not($child/@class))
                 then tei2:tei2div($child, $block-level-element-names)
                 else $child
         }
@@ -199,7 +187,6 @@ declare function tei2:tei2tei-recurser($node as node(), $annotations as element(
         }
 };
 
-(:Among the annotaitons to the whole document, retrieve the annotations belong to a particular element.:)
 (:The only $target value that is checked is 'edition'.:)
 declare function tei2:get-a8ns($element as element(), $annotations as element()*, $target as xs:string) {
     let $element-id := $element/@xml:id/string()
@@ -208,9 +195,26 @@ declare function tei2:get-a8ns($element as element(), $annotations as element()*
         $top-level-edition-a8ns 
 };
 
-(:This function takes a sequence of top-level text-critical annotations, 
-i.e annotations of @type 'range' and @layer 'edition', 
-and inserts as children all annotations that refer to them through their @xml:id, recursively:)
+(:unused function:)
+declare function tei2:header($header as element(tei:teiHeader)) {
+    let $titleStmt := $header//tei:titleStmt
+    let $pubStmt := $header//tei:publicationStmt
+    return
+        <div class="play-header">
+            <h1><a href="plays/{$header/ancestor::tei:TEI/@xml:id}.html">{$titleStmt/tei:title/text()}</a></h1>
+            <h2>By {$titleStmt/tei:author/text()}</h2>
+            <ul>
+            {
+                for $resp in $titleStmt/tei:respStmt
+                return
+                    <li>{$resp/tei:resp/text()}: {$resp/tei:name/text()}</li>
+            }
+            </ul>
+            { tei2:tei2html($pubStmt/*, 'feature', 'html') }
+        </div>
+};
+
+(: This function takes a sequence of top-level text-critical annotations, i.e annotations of @type 'range' and @layer 'edition', and inserts as children all annotations that refer to them through their @xml:id, recursively:)
 declare function tei2:build-up-annotations($top-level-critical-annotations as element()*, $annotations as element()*) as element()* {
     for $annotation in $top-level-critical-annotations
         let $annotation-id := $annotation/@xml:id/string()
@@ -218,16 +222,61 @@ declare function tei2:build-up-annotations($top-level-critical-annotations as el
         let $children := $annotations[a8n:target/a8n:id eq $annotation-id]
         let $children :=
             for $child in $children
-            let $child-id := $annotation/@xml:id/string()
-            return
-                if ($annotations/a8n:annotation[a8n:target/a8n:id = $child-id])
-                then tei2:build-up-annotations($child, $annotations)
-                else $child
-        return 
-            local:insert-elements($annotation, $children, $annotation-element-name,  'first-child')            
+                let $child-id := $annotation/@xml:id/string()
+                    return
+                        if ($annotations/a8n:annotation[a8n:target/a8n:id = $child-id])
+                        then tei2:build-up-annotations($child, $annotations)
+                        else $child
+            return 
+                local:insert-elements($annotation, $children, $annotation-element-name,  'first-child')            
 };
 
-(:Recurser for tei2:collapse-annotation().:)
+(: This function inserts elements supplied as $new-nodes at a certain position, determined by $element-names-to-check and $location, or removes the $element-names-to-check globally :)
+declare function local:insert-elements($node as node(), $new-nodes as node()*, $element-names-to-check as xs:string+, $location as xs:string) {
+        if ($node instance of element() and local-name($node) = $element-names-to-check)
+        then
+            if ($location eq 'before')
+            then ($new-nodes, $node) 
+            else 
+                if ($location eq 'after')
+                then ($node, $new-nodes)
+                else
+                    if ($location eq 'first-child')
+                    then element {node-name($node)}
+                        {
+                            $node/@*
+                            ,
+                            $new-nodes
+                            ,
+                            for $child in $node/node()
+                                return $child
+                        }
+                    else
+                        if ($location eq 'last-child')
+                        then element {node-name($node)}
+                            {
+                                $node/@*
+                                ,
+                                for $child in $node/node()
+                                    return $child 
+                                ,
+                                $new-nodes
+                            }
+                        else () (:The $element-to-check is removed if none of the four options, e.g. 'remove', are used.:)
+        else
+            if ($node instance of element()) 
+            then
+                element {node-name($node)} 
+                {
+                    $node/@*
+                    ,
+                    for $child in $node/node()
+                        return 
+                            local:insert-elements($child, $new-nodes, $element-names-to-check, $location) 
+                }
+            else $node
+};
+
 (:TODO: Clear up why tei2:collapse-annotation() has to be run three times.:) 
 declare function tei2:collapse-annotations($built-up-critical-annotations as element()*) {
     for $annotation in $built-up-critical-annotations
@@ -280,7 +329,7 @@ declare function tei2:merge-annotations($base-text as element(), $annotations as
     let $segments := 
             for $segment in $segments
                 return
-                    if (number($segment/@n) mod 2 eq 0) (:An annotation is being processed.:)
+                    if (number($segment/@n) mod 2 eq 0) (:an annotation is being processed:)
                     then
                         let $annotation-n := $segment/@n/number() div 2
                         let $annotation := $annotations[$annotation-n]
@@ -315,7 +364,7 @@ declare function tei2:merge-annotations($base-text as element(), $annotations as
                             else $annotation/(* except a8n:target)
                         return
                             local:insert-elements($segment, $annotation, 'segment', 'first-child')
-                    else (:A text node is being processed.:)
+                    else (:a text node:)
                         <segment n="{$segment/@n/string()}">
                             {
                                 let $segment-n := number($segment/@n)
@@ -338,9 +387,9 @@ declare function tei2:merge-annotations($base-text as element(), $annotations as
                                     else
                                         if ($segment-n eq 1) (:if it is the first text node:)
                                         then $annotations[$following-annotation-n]/a8n:target/a8n:start/number() - 1
-                                        (:if it is the first text node, the the offset is the start position of the following annotation minus 1:)
+                                            (:if it is the first text node, the the offset is the start position of the following annotation minus 1:)
                                         else $annotations[$following-annotation-n]/a8n:target/a8n:start/number() - ($annotations[$previous-annotation-n]/a8n:target/a8n:start/number() + $annotations[$previous-annotation-n]/a8n:target/a8n:offset/number())
-                                        (:if it is not the first or the last text node, then the offset is the start position of the following annotation minus the end position of the previous annotation :)
+                                            (:if it is not the first or the last text node, then the offset is the start position of the following annotation minus the end position of the previous annotation :)
                                 return
                                     if (number($start) and number($offset))
                                     then substring($base-text, $start, $offset)
@@ -356,53 +405,4 @@ declare function tei2:merge-annotations($base-text as element(), $annotations as
                 else $segment/string()
         return 
             element {node-name($base-text)}{$base-text/@*, $segments}
-};
-
-(: This function inserts elements supplied as $new-nodes at a certain position, 
-determined by $element-names-to-check and $location, 
-or removes the $element-names-to-check globally :)
-(:NB: Unused portions of function are commented out.:)
-declare function local:insert-elements($node as node(), $new-nodes as node()*, $element-names-to-check as xs:string+, $location as xs:string) {
-        if ($node instance of element() and local-name($node) = $element-names-to-check)
-        then
-            (:if ($location eq 'before')
-            then ($new-nodes, $node) 
-            else 
-                if ($location eq 'after')
-                then ($node, $new-nodes)
-                else:)
-                    if ($location eq 'first-child')
-                    then element {node-name($node)}
-                        {
-                            $node/@*
-                            ,
-                            $new-nodes
-                            ,
-                            for $child in $node/node()
-                                return $child
-                        }
-                    (:else
-                        if ($location eq 'last-child')
-                        then element {node-name($node)}
-                            {
-                                $node/@*
-                                ,
-                                for $child in $node/node()
-                                    return $child 
-                                ,
-                                $new-nodes
-                            }:)
-                        else () (:The $element-to-check is removed if none of the four options, e.g. 'remove', are used.:)
-        else
-            if ($node instance of element()) 
-            then
-                element {node-name($node)} 
-                {
-                    $node/@*
-                    ,
-                    for $child in $node/node()
-                        return 
-                            local:insert-elements($child, $new-nodes, $element-names-to-check, $location) 
-                }
-            else $node
 };
