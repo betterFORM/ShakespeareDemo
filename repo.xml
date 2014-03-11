@@ -10,5 +10,5 @@
     <repo:target>shakespeare</repo:target>
     <repo:prepare>pre-install.xql</repo:prepare>
     <repo:finish/>
-    <deployed>2012-11-05T21:07:57.844+01:00</deployed>
+    <deployed>2014-02-19T15:32:54.122+01:00</deployed>
 </repo:meta>
