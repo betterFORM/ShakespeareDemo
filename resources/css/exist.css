@@ -186,7 +186,7 @@ blockquote p { padding: 0 0 10px; }
 
 /* ---------------------------------------- Local styles ----------------------------------- */
 
-span {color: red;}
+.play span {color: red;}
 
 #quicksearch {
     margin: 10px 0;
