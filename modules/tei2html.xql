@@ -7,9 +7,9 @@ import module namespace config="http://exist-db.org/apps/shakes/config" at "conf
 declare namespace tei="http://www.tei-c.org/ns/1.0";
 declare namespace a8n="http://www.betterform.de/projects/mopane/annotation";
 
-(:values for $base-layer: 'stored', 'generated':)
-(:values for $target-layer: 'feature', 'edition':)
-(:values for $target-format: 'html':)
+(:values for $base-layer: 'stored', 'generated':)(:NB: not used yet:)
+(:values used for $target-layer: 'base', 'feature', 'edition':)
+(:values used for $target-format: 'html':)
 declare function tei2:tei2html($nodes as node()*, $target-layer as xs:string, $target-format as xs:string) {
         
     (:Get the document's xml:id.:)
@@ -18,7 +18,8 @@ declare function tei2:tei2html($nodes as node()*, $target-layer as xs:string, $t
     
     (:Get all annotations for the document in question.:)
     (:NB: This is perhaps too much. One could collect annotations for each element being recursed instead. 
-    One could also store annotations in collections created for each xml:id, in the hierarchy of their elements.:)
+    One could also store annotations in collections created for each xml:id, in the hierarchy of their elements. 
+    Would the frequence of the collection calls be worth it, compared to moving around all annotations for the document?:)
     let $annotations := collection(($config:a8ns) || "/" || $doc-id)/*
     
     return
@@ -45,7 +46,7 @@ declare function tei2:annotate($nodes as node()*, $annotations as element()*, $t
         then tei2:build-up-annotations($top-level-a8ns, $annotations)
         else ()
     
-    (:Collapse the built-up edition annotations, that is, preparing them for insertion into the base text
+    (:Collapse the built-up edition annotations, that is, prepare them for insertion into the base text
     by removing all elements except the contents of body.:)
     (:TODO: make code for collapsing attributes.:)
     let $collapsed-a8ns := 
@@ -215,16 +216,16 @@ i.e annotations of @type 'range' and @layer 'edition',
 and inserts as children all annotations that refer to them through their @xml:id, recursively:)
 declare function tei2:build-up-annotations($top-level-critical-annotations as element()*, $annotations as element()*) as element()* {
     for $annotation in $top-level-critical-annotations
+    return
+        tei2:build-up-annotation($annotation, $annotations)
+};
+
+declare function tei2:build-up-annotation($annotation as element(), $annotations as element()*) as element()* {
         let $annotation-id := $annotation/@xml:id/string()
         let $annotation-element-name := local-name($annotation//a8n:body/*)
         let $children := $annotations[a8n:target/a8n:id eq $annotation-id]
         let $children :=
-            for $child in $children
-            let $child-id := $annotation/@xml:id/string()
-            return
-                if ($annotations/a8n:annotation[a8n:target/a8n:id = $child-id])
-                then tei2:build-up-annotations($child, $annotations)
-                else $child
+            tei2:build-up-annotations($children, $annotations)
         return 
             local:insert-elements($annotation, $children, $annotation-element-name,  'first-child')            
 };
@@ -235,6 +236,24 @@ declare function tei2:collapse-annotations($built-up-critical-annotations as ele
     for $annotation in $built-up-critical-annotations
     return 
         tei2:collapse-annotation(tei2:collapse-annotation(tei2:collapse-annotation($annotation, 'annotation'), 'body'), 'base-layer')
+};
+
+declare function tei2:attach-attributes($elements as element()*) as element() {
+    for $element in $elements
+    return 
+        tei2:attach-attribute($element)
+};
+
+declare function tei2:attach-attribute($element as element()) as element() {
+    let $element := $element
+    let $attribute := $element/a8n:attribute
+    return
+    element {node-name($element)}
+    {$element/@*,
+        if ($element//a8n:attribute)
+        then attribute {$element//a8n:attribute/a8n:name/string()} {$element//a8n:attribute/a8n:value}
+        else ()
+      }
 };
 
 (: This function takes a built-up annotation and 
@@ -253,7 +272,7 @@ declare function tei2:collapse-annotation($element as element(), $strip as xs:st
                 return 
                     tei2:collapse-annotation(($child), $strip)
             else
-                if ($child instance of element() and local-name($child) = ('layer-offset-difference', 'authoritative-layer')) (:we have no need for these two elements:)
+                if ($child instance of element() and local-name($child) = ('layer-offset-difference', 'authoritative-layer')) (:we have no need for these two elements - actually, they have been removed, but should they be introduced again?:)
                 then ()
                 else
                     if ($child instance of element() and local-name($child) = 'target' and local-name($child/parent::element()) ne 'annotation') (:remove all target elements that are not at the base level:)
