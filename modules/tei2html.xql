@@ -272,7 +272,7 @@ declare function tei2:collapse-annotation($element as element(), $strip as xs:st
                 return 
                     tei2:collapse-annotation(($child), $strip)
             else
-                if ($child instance of element() and local-name($child) = ('layer-offset-difference', 'authoritative-layer')) (:we have no need for these two elements - actually, they have been removed, but should they be introduced again?:)
+                if ($child instance of element() and local-name($child) = ('layer-offset-difference', 'authoritative-layer', 'attribute')) (:we have no need for these two elements - actually, they have been removed, but should they be introduced again?:)
                 then ()
                 else
                     if ($child instance of element() and local-name($child) = 'target' and local-name($child/parent::element()) ne 'annotation') (:remove all target elements that are not at the base level:)
