@@ -24,16 +24,16 @@ declare function tei2:tei2html($nodes as node()*, $target-layer as xs:string, $t
     let $annotations := collection(($config:a8ns) || "/" || $doc-id)/*
     
     return
-        tei2:annotate($nodes, $annotations, $target-layer, $target-format)
+        tei2:annotate-text($nodes, $annotations, $target-layer, $target-format)
 };
 
-declare function tei2:annotate($nodes as node()*, $annotations as element()*, $target-layer as xs:string, $target-format as xs:string) {
+declare function tei2:annotate-text($nodes as node()*, $annotations as element()*, $target-layer as xs:string, $target-format as xs:string) {
             
     (:Recurse though the document.:)
     let $node := tei2:tei2tei-recurser($nodes, $annotations, $target-layer, $target-format)
     
     (:Get the top-level edition annotations for the element in question, that is, 
-    the edition annotations that connect to the base text though text ranges.:)
+    the edition annotations that connect to the base text through text ranges.:)
     let $top-level-a8ns := 
         if ($annotations)
         then tei2:get-a8ns($node, $annotations, 'edition')
@@ -47,17 +47,19 @@ declare function tei2:annotate($nodes as node()*, $annotations as element()*, $t
         else ()
     
     (:Collapse the built-up edition annotations, that is, prepare them for insertion into the base text
-    by removing all elements except the contents of body.:)
+    by removing all elements except the contents of body and attaching attributes.:)
     let $collapsed-a8ns := 
         if ($built-up-a8ns) 
         then tei2:collapse-annotations($built-up-a8ns)
         else ()
     
     (:Insert the collapsed annotations into the base-text.:)
-    let $text-with-meshed-a8ns := 
+    let $text-with-merged-a8ns := 
         if ($collapsed-a8ns) 
         then tei2:merge-annotations($node, $collapsed-a8ns, 'edition', 'tei')
         else $node
+    (:Result: base text with edition annotations inserted.:)
+    (:TODO: Transform to show target text with edition annotations inserted; use this a basis for generating target text?:)
     
     (:On the basis of the inserted edition annotations, contruct the target text.:)
     (:TODO: Into the target text, spans identifying the edition annotations should be inserted, 
@@ -65,9 +67,9 @@ declare function tei2:annotate($nodes as node()*, $annotations as element()*, $t
     Resurrect old code for layer-offset-difference and merge both edition and feature annotation with target text.:)  
     (:TODO: Make it possible for the whole text node to be wrapped up in an (inline) element.:)
     let $target-text := 
-        if ($text-with-meshed-a8ns/text())
-        then tei2:tei2target($text-with-meshed-a8ns, 'target')
-        else $text-with-meshed-a8ns
+        if ($text-with-merged-a8ns/text())
+        then tei2:tei2target($text-with-merged-a8ns, 'target')
+        else $text-with-merged-a8ns
         
     (:Get the top-level feature annotations for the element in question, that is, 
     the feature annotations that connect to the target text though text ranges.:)
@@ -91,14 +93,14 @@ declare function tei2:annotate($nodes as node()*, $annotations as element()*, $t
         else ()
     
     (:Insert the collapsed annotations into the target text, producing the marked-up TEI document.:)
-    let $text-with-meshed-a8ns := 
+    let $text-with-merged-a8ns := 
         if ($collapsed-a8ns) 
         then tei2:merge-annotations($target-text, $collapsed-a8ns, 'feature', $target-format)
         else $node
     
     (:Convert the TEI document to HTML: block-level elements become divs and inline element become spans.:)
     let $block-level-element-names := ('ab', 'body', 'castGroup', 'castItem', 'castList', 'div', 'front', 'head', 'l', 'lg', 'role', 'roleDesc', 'sp', 'speaker', 'stage', 'TEI', 'text', 'p', 'quote' )
-    let $html := tei2:tei2div($text-with-meshed-a8ns, $block-level-element-names)
+    let $html := tei2:tei2div($text-with-merged-a8ns, $block-level-element-names)
     
     return
         $html
@@ -179,7 +181,7 @@ declare function tei2:tei2target($node as node()*, $target-layer as xs:string) {
 (:The usual way of converting TEI into "quasi-semantic" HTML is avoided.:)
 declare function tei2:tei2div($node as node(), $block-level-element-names as xs:string+) {
     element {if (local-name($node) = $block-level-element-names) then 'div' else 'span'}
-        {$node/@*, attribute {'class'}{local-name($node)}
+        {$node/@*, attribute {'class'}{local-name($node)}, attribute {'title'}{local-name($node)}
         , 
         for $child in $node/node()
         return 
@@ -196,7 +198,7 @@ declare function tei2:tei2tei-recurser($node as node(), $annotations as element(
         for $child in $node/node()
         return
             if ($child instance of element())
-            then tei2:annotate($child, $annotations, $target-layer, $target-format)
+            then tei2:annotate-text($child, $annotations, $target-layer, $target-format)
             else $child
         }
 };
@@ -265,22 +267,19 @@ declare function tei2:collapse-annotation($element as element(), $strip as xs:st
                 return 
                     tei2:collapse-annotation(($child), $strip)
             else
-                if ($child instance of element() and local-name($child) = ('layer-offset-difference', 'authoritative-layer')) (:we have no need for these two elements - actually, they have been removed, but should they be introduced again?:)
+                if ($child instance of element() and local-name($child) = ('attribute', 'layer-offset-difference', 'authoritative-layer')) (:we have no need for these two elements - actually, they have been removed, but should they be introduced again?:)
                 then ()
                 else
+                    (:skip the attribute attached above:)
                     if ($child instance of element() and local-name($child) = 'target' and local-name($child/parent::element()) ne 'annotation') (:remove all target elements that are not at the base level:)
                     then ()
                     else
-                        (:skip the attribute attached above:)
-                        if ($child instance of element() and local-name($child) = 'attribute')
-                        then ()
+                        if ($child instance of element() and local-name($child/..) = ('lem', 'rdg', 'sic', 'reg') ) (:take string value of elements that are below terminal elements concerned with edition:)
+                        then string-join($child//text(), ' ') (:NB: This is a hack (@token should be used) but in real life text-critical annotations will not have sibling children with text nodes, so this is only relevant to round-tripping with annotations that mix text-critical and feature annotations.:)
                         else
-                            if ($child instance of element() and local-name($child/..) = ('lem', 'rdg', 'sic', 'reg') ) (:take string value of elements that are below terminal elements concerned with edition:)
-                            then string-join($child//text(), ' ') (:NB: This is a hack (@token should be used) but in real life text-critical annotations will not have sibling children with text nodes, so this is only relevant to round-tripping with annotations that mix text-critical and feature annotations.:)
-                            else
-                                if ($child instance of text())
-                                then $child
-                                else tei2:collapse-annotation($child, $strip)
+                            if ($child instance of text())
+                            then $child
+                            else tei2:collapse-annotation($child, $strip)
       }
 };
 
@@ -307,32 +306,17 @@ declare function tei2:merge-annotations($base-text as element(), $annotations as
                     let $annotation-start := number($annotation//a8n:start)
                     let $annotation-offset := number($annotation//a8n:offset)
                     let $annotation := 
-                        (:If the target format is HTML, store the TEI element name in @title. 
-                        Discard any attributes, but add the @xml:id of the annotation, making retrieval possible.:)
-                        (:NB: Could the element be rendered as a span at this point?:)
-                        if ($target-layer eq 'feature' and $target-format eq 'html')
-                        then
-                            let $annotation-body-child := $annotation/(* except a8n:target)
-                            let $annotation-body-child := node-name($annotation-body-child) 
-                            let $annotated-string := substring($base-text, $annotation-start, $annotation-offset)
-                            return
-                                element{$annotation-body-child}
-                                {
-                                attribute xml:id {$annotation/@xml:id/string()}
-                                ,
-                                attribute title {$annotation-body-child}
-                                ,
-                                $annotated-string}
-                        else
-                            (:If the feature layer is to be output as TEI, do not discard attributes.:)
-                            if ($target-layer eq 'feature' and $target-format eq 'tei')
+                        (:Add the @xml:id of the annotation, making retrieval possible.:)
+                        if ($target-layer eq 'feature')
                             then
                                 let $annotation-body-child := $annotation/(* except a8n:target)
-                                let $annotation-body-child := node-name($annotation-body-child) 
+                                let $annotation-body-child-name := node-name($annotation-body-child) 
                                 let $annotated-string := substring($base-text, $annotation-start, $annotation-offset)
                                 return
-                                    element {$annotation-body-child}{$annotation-body-child/@*, 
-                                    
+                                    element {$annotation-body-child-name}
+                                    {
+                                    $annotation-body-child/@*
+                                    ,
                                     attribute xml:id {$annotation/@xml:id/string()}
                                     ,
                                     $annotated-string}
