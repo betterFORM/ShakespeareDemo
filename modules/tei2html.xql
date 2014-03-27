@@ -7,9 +7,10 @@ import module namespace config="http://exist-db.org/apps/shakes/config" at "conf
 declare namespace tei="http://www.tei-c.org/ns/1.0";
 declare namespace a8n="http://www.betterform.de/projects/mopane/annotation";
 
-(:values for $base-layer: 'stored', 'generated':)(:NB: not used yet:)
-(:values used for $target-layer: 'base', 'feature', 'edition':)
-(:values used for $target-format: 'html':)
+(:values for $action: 'store', 'display':)(:NB: not used yet:)
+(:values for $base: 'stored', 'generated':)(:NB: not used yet:)
+(:values used for $target-layer: 'base', 'feature', 'edition':) (:Should 'base' be moved to separate variable, target-text?:)
+(:values used for $target-format: 'tei', 'html':)
 declare function tei2:tei2html($nodes as node()*, $target-layer as xs:string, $target-format as xs:string) {
         
     (:Get the document's xml:id.:)
@@ -40,7 +41,6 @@ declare function tei2:annotate($nodes as node()*, $annotations as element()*, $t
     
     (:Build up the top-level edition annotations, that is, 
     insert annotations that reference the top-level edition annotations recursively into the top-level edition annotations.:)
-    (:TODO: make sanity check of annotations, checking for superimposition, overlap.:)
     let $built-up-a8ns := 
         if ($top-level-a8ns) 
         then tei2:build-up-annotations($top-level-a8ns, $annotations)
@@ -56,7 +56,7 @@ declare function tei2:annotate($nodes as node()*, $annotations as element()*, $t
     (:Insert the collapsed annotations into the base-text.:)
     let $text-with-meshed-a8ns := 
         if ($collapsed-a8ns) 
-        then tei2:merge-annotations($node, $collapsed-a8ns, 'edition', $target-format)
+        then tei2:merge-annotations($node, $collapsed-a8ns, 'edition', 'tei')
         else $node
     
     (:On the basis of the inserted edition annotations, contruct the target text.:)
@@ -290,7 +290,7 @@ annotations are filled into the even slots, whereas the text,
 with ranges calculated from the previous and following annotations, 
 are filled into the uneven slots. Uneven slots with empty strings can occur, 
 but even slots all have annotations (though they may consist of empty elements).:)
-(:TODO: Add code to check whether non-valid XML is produced.:)
+(:TODO: check annotations for superimposition, containment, overlap.:)
 declare function tei2:merge-annotations($base-text as element(), $annotations as element()*, $target-layer as xs:string, $target-format as xs:string) as node()+ {
     let $segment-count := (count($annotations) * 2) + 1
     let $segments :=
@@ -307,6 +307,9 @@ declare function tei2:merge-annotations($base-text as element(), $annotations as
                     let $annotation-start := number($annotation//a8n:start)
                     let $annotation-offset := number($annotation//a8n:offset)
                     let $annotation := 
+                        (:If the target format is HTML, store the TEI element name in @title. 
+                        Discard any attributes, but add the @xml:id of the annotation, making retrieval possible.:)
+                        (:NB: Could the element be rendered as a span at this point?:)
                         if ($target-layer eq 'feature' and $target-format eq 'html')
                         then
                             let $annotation-body-child := $annotation/(* except a8n:target)
@@ -320,22 +323,26 @@ declare function tei2:merge-annotations($base-text as element(), $annotations as
                                 attribute title {$annotation-body-child}
                                 ,
                                 $annotated-string}
-                        else 
-                            if ($target-layer eq 'feature' and $target-format ne 'html')
+                        else
+                            (:If the feature layer is to be output as TEI, do not discard attributes.:)
+                            if ($target-layer eq 'feature' and $target-format eq 'tei')
                             then
                                 let $annotation-body-child := $annotation/(* except a8n:target)
                                 let $annotation-body-child := node-name($annotation-body-child) 
                                 let $annotated-string := substring($base-text, $annotation-start, $annotation-offset)
                                 return
-                                    element{$annotation-body-child}
-                                    {
+                                    element {$annotation-body-child}{$annotation-body-child/@*, 
+                                    
                                     attribute xml:id {$annotation/@xml:id/string()}
                                     ,
                                     $annotated-string}
+                        (:If the edition layer is to be output, take the element from the built-up annotation.:)
+                        (:TODO: It should also be possible to output the edition layer as HTML.:)
                         else $annotation/(* except a8n:target)
                     return
                         local:insert-elements($segment, $annotation, 'segment', 'first-child')
-                else (:A text node is being processed.:)
+                (:A text node is being processed.:)
+                else
                     <segment n="{$segment/@n/string()}">
                         {
                         let $segment-n := number($segment/@n)
