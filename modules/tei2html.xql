@@ -48,7 +48,6 @@ declare function tei2:annotate($nodes as node()*, $annotations as element()*, $t
     
     (:Collapse the built-up edition annotations, that is, prepare them for insertion into the base text
     by removing all elements except the contents of body.:)
-    (:TODO: make code for collapsing attributes.:)
     let $collapsed-a8ns := 
         if ($built-up-a8ns) 
         then tei2:collapse-annotations($built-up-a8ns)
@@ -236,54 +235,52 @@ declare function tei2:collapse-annotations($built-up-critical-annotations as ele
     for $annotation in $built-up-critical-annotations
     return 
         tei2:collapse-annotation(tei2:collapse-annotation(tei2:collapse-annotation($annotation, 'annotation'), 'body'), 'base-layer')
-};
-
-declare function tei2:attach-attributes($elements as element()*) as element() {
-    for $element in $elements
-    return 
-        tei2:attach-attribute($element)
-};
-
-declare function tei2:attach-attribute($element as element()) as element() {
-    let $element := $element
-    let $attribute := $element/a8n:attribute
-    return
-    element {node-name($element)}
-    {$element/@*,
-        if ($element//a8n:attribute)
-        then attribute {$element//a8n:attribute/a8n:name/string()} {$element//a8n:attribute/a8n:value}
-        else ()
-      }
+        (:NB: 'base-layer' does not appear to be used.:)
 };
 
 (: This function takes a built-up annotation and 
-1) collapses it, i.e. removes levels from the hierarchy by substituting elements with their children, 
-2) removes unneeded elements, and 
-3) takes the string values of terminal text-critical elements that have child feature annotations. :)
-(:TODO: attributes have to be inserted.:)
+1) attaches attributes, stored as grandchildren,
+2) collapses it, i.e. removes levels from the hierarchy by substituting elements with their children, 
+3) removes unneeded elements, and 
+4) takes the string values of terminal text-critical elements that have child feature annotations. :)
 declare function tei2:collapse-annotation($element as element(), $strip as xs:string+) as element() {
     element {node-name($element)}
-    {$element/@*,
+    {$element/@*, 
+        if ($element/*/*/a8n:attribute)
+        then 
+            for $attribute in $element/*/*/a8n:attribute
+            return
+                let $attribute-name := $attribute/a8n:name/string()
+                let $attribute-value := $attribute/a8n:value/string()
+                return
+                    attribute {$attribute-name} {$attribute-value}
+        else ()
+        ,
         for $child in $element/node()
         return
+            (:If the child is on the list of elements to be stripped, just bypass it and substitute its children.:)
             if ($child instance of element() and local-name($child) = $strip)
             then 
                 for $child in $child/*
                 return 
                     tei2:collapse-annotation(($child), $strip)
             else
-                if ($child instance of element() and local-name($child) = ('layer-offset-difference', 'authoritative-layer', 'attribute')) (:we have no need for these two elements - actually, they have been removed, but should they be introduced again?:)
+                if ($child instance of element() and local-name($child) = ('layer-offset-difference', 'authoritative-layer')) (:we have no need for these two elements - actually, they have been removed, but should they be introduced again?:)
                 then ()
                 else
                     if ($child instance of element() and local-name($child) = 'target' and local-name($child/parent::element()) ne 'annotation') (:remove all target elements that are not at the base level:)
                     then ()
                     else
-                        if ($child instance of element() and local-name($child/..) = ('lem', 'rdg', 'sic', 'reg') ) (:take string value of elements that are below terminal elements concerned with edition:)
-                        then string-join($child//text(), ' ') (:This is a hack (@token should be used) but in real life text-critical annotations will not have sibling children with text nodes, so this is only relevant to round-tripping with annotations that mix text-critical and feature annotations.:)
+                        (:skip the attribute attached above:)
+                        if ($child instance of element() and local-name($child) = 'attribute')
+                        then ()
                         else
-                            if ($child instance of text())
-                            then $child
-                            else tei2:collapse-annotation($child, $strip)
+                            if ($child instance of element() and local-name($child/..) = ('lem', 'rdg', 'sic', 'reg') ) (:take string value of elements that are below terminal elements concerned with edition:)
+                            then string-join($child//text(), ' ') (:NB: This is a hack (@token should be used) but in real life text-critical annotations will not have sibling children with text nodes, so this is only relevant to round-tripping with annotations that mix text-critical and feature annotations.:)
+                            else
+                                if ($child instance of text())
+                                then $child
+                                else tei2:collapse-annotation($child, $strip)
       }
 };
 
