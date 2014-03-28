@@ -176,13 +176,23 @@ declare %private function app:create-query() {
                 return
                     <term occur="should">{$term}</term>
             else if ($mode eq 'all') then
-                for $term in tokenize($queryStr, '\s')
-                return
-                    <term occur="must">{$term}</term>
+                <bool>
+                {
+                    for $term in tokenize($queryStr, '\s')
+                    return
+                        <term occur="must">{$term}</term>
+                }
+                </bool>
             else if ($mode eq 'phrase') then
                 <phrase>{$queryStr}</phrase>
             else
-                <near>{$queryStr}</near>
+                <near slop="5" ordered="no">
+                {
+                    for $term in tokenize($queryStr, '\s')
+                    return
+                        <term>{$term}</term>
+                }
+                </near>
         }
         </query>
 };
